@@ -850,4 +850,13 @@ button {
   .checkout-steps {
     display: none;
   }
+
+  .coupon-row {
+    display: flex;
+    gap: 12px;
+  }
+
+  .coupon-row input {
+    flex: 1;
+  }
 }

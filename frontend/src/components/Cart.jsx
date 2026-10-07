@@ -56,22 +56,11 @@ function Cart() {
     );
   }
 
-  const subtotal = cart.items.reduce(
-    (sum, item) =>
-      sum + item.unitPrice * item.quantity,
-    0
-  );
-
-  const shipping = subtotal >= 100 ? 0 : 8.99;
-
-  const tax = subtotal * 0.08;
-
-  const total = subtotal + shipping + tax;
-
-  const itemCount = cart.items.reduce(
-    (sum, item) => sum + item.quantity,
-    0
-  );
+  const subtotal = cart.subtotal;
+  const shipping = cart.shipping;
+  const tax = cart.tax;
+  const total = cart.total;
+  const itemCount = cart.itemCount;
 
   if (cart.items.length === 0) {
     return (
@@ -141,7 +130,7 @@ function Cart() {
                   <h3>{item.productName}</h3>
 
                   <p className="in-stock">
-                    ✓ In stock
+                    {item.availableQuantity} available
                   </p>
 
                   <p className="unit-price">
@@ -206,11 +195,21 @@ function Cart() {
           })}
 
           <div className="shipping-message">
-            <strong>🚚 Free shipping</strong>
-
-            <span>
-              Your order qualifies for free shipping.
-            </span>
+            {shipping === 0 ? (
+              <>
+                <strong>🚚 Free shipping</strong>
+                <span>
+                  Your order qualifies for free shipping.
+                </span>
+              </>
+            ) : (
+              <>
+                <strong>🚚 Shipping</strong>
+                <span>
+                  Add ${(100 - subtotal).toFixed(2)} more for free shipping.
+                </span>
+              </>
+            )}
           </div>
 
         </section>

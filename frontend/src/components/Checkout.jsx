@@ -1,18 +1,53 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { getCart } from "../api";
+import { Link, useNavigate } from "react-router-dom";
+
+import { getCart, checkout } from "../api";
 
 function Checkout() {
   const [cart, setCart] = useState(null);
+  const [couponCode, setCouponCode] = useState("");
+  const [error, setError] = useState("");
+  const [placingOrder, setPlacingOrder] = useState(false);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function loadCart() {
-      const data = await getCart();
-      setCart(data);
+      try {
+        const data = await getCart();
+        setCart(data);
+      } catch (error) {
+        setError(error.message);
+      }
     }
 
     loadCart();
   }, []);
+
+  async function handlePlaceOrder() {
+    setError("");
+
+    if (cart.items.length === 0) {
+      setError("Your cart is empty.");
+      return;
+    }
+
+    try {
+      setPlacingOrder(true);
+
+      const order = await checkout(
+        couponCode.trim() || null
+      );
+
+      navigate("/confirmation", {
+        state: { order },
+      });
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setPlacingOrder(false);
+    }
+  }
 
   if (!cart) {
     return (
@@ -22,23 +57,14 @@ function Checkout() {
     );
   }
 
-  const subtotal = cart.items.reduce(
-    (sum, item) =>
-      sum + item.unitPrice * item.quantity,
-    0
-  );
-
-  const shipping = subtotal >= 100 ? 0 : 8.99;
-
-  const tax = subtotal * 0.08;
-
-  const total = subtotal + shipping + tax;
+  const subtotal = cart.subtotal;
+  const shipping = cart.shipping;
+  const tax = cart.tax;
+  const total = cart.total;
 
   return (
     <main className="checkout-page">
-
       <div className="checkout-header">
-
         <Link to="/" className="logo">
           ShopEasy
         </Link>
@@ -46,11 +72,9 @@ function Checkout() {
         <div className="secure-label">
           🔒 Secure Checkout
         </div>
-
       </div>
 
       <div className="checkout-steps">
-
         <div className="step active">
           <span>1</span>
           Delivery
@@ -69,19 +93,19 @@ function Checkout() {
           <span>3</span>
           Confirmation
         </div>
-
       </div>
 
       <div className="checkout-layout">
-
         <section className="checkout-form">
-
           <h1>Checkout</h1>
 
-          {/* DELIVERY */}
+          {error && (
+            <div className="error">
+              {error}
+            </div>
+          )}
 
           <div className="checkout-section">
-
             <div className="section-heading">
               <div className="section-number">
                 1
@@ -96,7 +120,6 @@ function Checkout() {
             </div>
 
             <div className="form-grid">
-
               <label>
                 First name
                 <input placeholder="First name" />
@@ -131,17 +154,11 @@ function Checkout() {
                 Phone number
                 <input placeholder="Phone number" />
               </label>
-
             </div>
-
           </div>
 
-          {/* PAYMENT */}
-
           <div className="checkout-section">
-
             <div className="section-heading">
-
               <div className="section-number">
                 2
               </div>
@@ -152,11 +169,9 @@ function Checkout() {
                   Your payment information is secure.
                 </p>
               </div>
-
             </div>
 
             <div className="payment-option selected">
-
               <input
                 type="radio"
                 checked
@@ -164,14 +179,17 @@ function Checkout() {
               />
 
               <div>
-                <strong>Credit or debit card</strong>
-                <p>Visa, Mastercard, Amex</p>
-              </div>
+                <strong>
+                  Credit or debit card
+                </strong>
 
+                <p>
+                  Visa, Mastercard, Amex
+                </p>
+              </div>
             </div>
 
             <div className="form-grid">
-
               <label className="full">
                 Card number
                 <input
@@ -188,37 +206,59 @@ function Checkout() {
                 CVV
                 <input placeholder="CVV" />
               </label>
-
             </div>
-
           </div>
 
-          <button className="place-order-button">
-            Place order · ${total.toFixed(2)}
+          <div className="checkout-section">
+            <div className="section-heading">
+              <div className="section-number">
+                %
+              </div>
+
+              <div>
+                <h2>Coupon</h2>
+                <p>
+                  Have a reward coupon?
+                </p>
+              </div>
+            </div>
+
+            <div className="coupon-row">
+              <input
+                value={couponCode}
+                onChange={(event) =>
+                  setCouponCode(event.target.value)
+                }
+                placeholder="Enter coupon code"
+              />
+            </div>
+          </div>
+
+          <button
+            className="place-order-button"
+            onClick={handlePlaceOrder}
+            disabled={placingOrder}
+          >
+            {placingOrder
+              ? "Placing order..."
+              : `Place order · $${total.toFixed(2)}`}
           </button>
 
           <p className="terms">
             By placing your order, you agree to our
             terms and conditions.
           </p>
-
         </section>
 
-        {/* ORDER SUMMARY */}
-
         <aside className="checkout-summary">
-
           <h2>Order summary</h2>
 
           <div className="checkout-items">
-
             {cart.items.map((item) => (
-
               <div
                 className="checkout-item"
                 key={item.productId}
               >
-
                 <div className="checkout-item-image">
                   {item.productName.charAt(0)}
                 </div>
@@ -240,22 +280,22 @@ function Checkout() {
                     item.quantity
                   ).toFixed(2)}
                 </strong>
-
               </div>
-
             ))}
-
           </div>
 
           <div className="summary-divider" />
 
           <div className="summary-line">
             <span>Subtotal</span>
-            <span>${subtotal.toFixed(2)}</span>
+            <span>
+              ${subtotal.toFixed(2)}
+            </span>
           </div>
 
           <div className="summary-line">
             <span>Shipping</span>
+
             <span>
               {shipping === 0
                 ? "FREE"
@@ -265,24 +305,27 @@ function Checkout() {
 
           <div className="summary-line">
             <span>Tax</span>
-            <span>${tax.toFixed(2)}</span>
+
+            <span>
+              ${tax.toFixed(2)}
+            </span>
           </div>
 
           <div className="summary-divider" />
 
           <div className="summary-total">
             <span>Total</span>
-            <strong>${total.toFixed(2)}</strong>
+
+            <strong>
+              ${total.toFixed(2)}
+            </strong>
           </div>
 
           <div className="secure-checkout">
             🔒 Your payment is protected
           </div>
-
         </aside>
-
       </div>
-
     </main>
   );
 }

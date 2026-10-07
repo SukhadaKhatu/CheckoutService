@@ -1,129 +1,219 @@
-const products = [
-  {
-    id: "p1",
-    name: "Wireless Headphones",
-    price: 99.99,
-    availableQuantity: 10,
-  },
-  {
-    id: "p2",
-    name: "Mechanical Keyboard",
-    price: 149.99,
-    availableQuantity: 5,
-  },
-  {
-    id: "p3",
-    name: "USB-C Charger",
-    price: 39.99,
-    availableQuantity: 20,
-  },
-  {
-    id: "p4",
-    name: "Laptop Stand",
-    price: 59.99,
-    availableQuantity: 8,
-  },
-];
+const API_BASE_URL = "http://localhost:3000/api";
 
-let cart = {
-  id: crypto.randomUUID(),
-  status: "ACTIVE",
-  items: [],
-};
+const CART_ID_KEY = "checkout_rewards_cart_id";
+
+async function request(path, options = {}) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+    ...options,
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error = new Error(
+      data?.error?.message || "Something went wrong"
+    );
+
+    error.code = data?.error?.code || "UNKNOWN_ERROR";
+    error.status = response.status;
+
+    throw error;
+  }
+
+  return data;
+}
+
+function getStoredCartId() {
+  return localStorage.getItem(CART_ID_KEY);
+}
+
+function storeCartId(cartId) {
+  localStorage.setItem(CART_ID_KEY, cartId);
+}
+
+async function getOrCreateCart() {
+  const existingCartId = getStoredCartId();
+
+  if (existingCartId) {
+    try {
+      const data = await request(
+        `/carts/${existingCartId}`
+      );
+
+      return data.cart;
+    } catch (error) {
+      if (error.code !== "CART_NOT_FOUND") {
+        throw error;
+      }
+
+      localStorage.removeItem(CART_ID_KEY);
+    }
+  }
+
+  const data = await request("/carts", {
+    method: "POST",
+  });
+
+  storeCartId(data.cart.id);
+
+  return data.cart;
+}
 
 export async function getProducts() {
-  return [...products];
+  const data = await request("/products");
+
+  return data.products.map((product) => ({
+    id: product.id,
+    name: product.name,
+
+    // Backend stores money as cents.
+    // Frontend continues working with dollars.
+    price: product.price_cents / 100,
+
+    availableQuantity: product.available_inventory,
+  }));
 }
 
 export async function createCart() {
-  cart = {
-    id: crypto.randomUUID(),
-    status: "ACTIVE",
+  const data = await request("/carts", {
+    method: "POST",
+  });
+
+  storeCartId(data.cart.id);
+
+  return {
+    ...data.cart,
     items: [],
   };
-
-  return { ...cart };
 }
 
 export async function getCart() {
+  const cart = await getOrCreateCart();
+
   return {
     ...cart,
-    items: cart.items.map((item) => ({ ...item })),
+
+    // Keep the frontend's existing item shape.
+    items: cart.items.map((item) => ({
+      productId: item.productId,
+      productName: item.productName,
+      unitPrice: item.unitPriceCents / 100,
+      quantity: item.quantity,
+      availableQuantity: item.availableInventory,
+    })),
+
+    itemCount: cart.itemCount,
+
+    // Convert backend cents to dollars for display.
+    subtotal: cart.subtotalCents / 100,
+    shipping: cart.shippingCents / 100,
+    tax: cart.taxCents / 100,
+    total: cart.totalCents / 100,
   };
 }
 
 export async function addItem(productId, quantity = 1) {
-  const product = products.find((p) => p.id === productId);
+  const cart = await getOrCreateCart();
 
-  if (!product) {
-    throw new Error("Product not found");
-  }
-
-  const existingItem = cart.items.find(
-    (item) => item.productId === productId
+  const data = await request(
+    `/carts/${cart.id}/items`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        productId,
+        quantity,
+      }),
+    }
   );
 
-  const newQuantity = existingItem
-    ? existingItem.quantity + quantity
-    : quantity;
-
-  if (newQuantity > product.availableQuantity) {
-    throw new Error(
-      `Only ${product.availableQuantity} units of ${product.name} are available`
-    );
-  }
-
-  if (existingItem) {
-    existingItem.quantity = newQuantity;
-  } else {
-    cart.items.push({
-      productId: product.id,
-      productName: product.name,
-
-      // This is the price displayed when the item was added.
-      unitPrice: product.price,
-
-      quantity,
-    });
-  }
-
-  return getCart();
+  return mapCart(data.cart);
 }
 
-export async function updateItemQuantity(productId, quantity) {
-  const item = cart.items.find(
-    (item) => item.productId === productId
-  );
-
-  if (!item) {
-    throw new Error("Cart item not found");
-  }
-
-  const product = products.find((p) => p.id === productId);
-
-  if (!product) {
-    throw new Error("Product no longer exists");
-  }
+export async function updateItemQuantity(
+  productId,
+  quantity
+) {
+  const cart = await getOrCreateCart();
 
   if (quantity <= 0) {
     return removeItem(productId);
   }
 
-  if (quantity > product.availableQuantity) {
-    throw new Error(
-      `Only ${product.availableQuantity} units are available`
-    );
-  }
+  const data = await request(
+    `/carts/${cart.id}/items/${productId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        quantity,
+      }),
+    }
+  );
 
-  item.quantity = quantity;
-
-  return getCart();
+  return mapCart(data.cart);
 }
 
 export async function removeItem(productId) {
-  cart.items = cart.items.filter(
-    (item) => item.productId !== productId
+  const cart = await getOrCreateCart();
+
+  const data = await request(
+    `/carts/${cart.id}/items/${productId}`,
+    {
+      method: "DELETE",
+    }
   );
 
-  return getCart();
+  return mapCart(data.cart);
+}
+
+function mapCart(cart) {
+  return {
+    ...cart,
+
+    items: cart.items.map((item) => ({
+      productId: item.productId,
+      productName: item.productName,
+      unitPrice: item.unitPriceCents / 100,
+      quantity: item.quantity,
+      availableQuantity: item.availableInventory,
+    })),
+
+    itemCount: cart.itemCount,
+    subtotal: cart.subtotalCents / 100,
+    shipping: cart.shippingCents / 100,
+    tax: cart.taxCents / 100,
+    total: cart.totalCents / 100,
+  };
+}
+
+export async function checkout(couponCode = null) {
+  const cart = await getOrCreateCart();
+
+  const idempotencyKey = crypto.randomUUID();
+
+  const data = await request(
+    `/carts/${cart.id}/checkout`,
+    {
+      method: "POST",
+      headers: {
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify({
+        couponCode: couponCode || null,
+      }),
+    }
+  );
+
+  // The old cart is now permanently checked out.
+  // Remove it so the next shopping session gets a new ACTIVE cart.
+  clearCart();
+
+  return data.order;
+}
+
+export function clearCart() {
+  localStorage.removeItem(CART_ID_KEY);
 }
