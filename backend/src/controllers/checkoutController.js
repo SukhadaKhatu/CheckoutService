@@ -26,3 +26,31 @@ export async function checkout(
     next(error);
   }
 }
+
+export async function getOrder(
+  req,
+  res,
+  next
+) {
+  try {
+    const order =
+      await checkoutService.findOrderById(
+        req.params.orderId
+      );
+
+    if (!order) {
+      const error =
+        new Error("Order not found");
+
+      error.code = "ORDER_NOT_FOUND";
+
+      throw error;
+    }
+
+    res.json({
+      order,
+    });
+  } catch (error) {
+    next(error);
+  }
+}

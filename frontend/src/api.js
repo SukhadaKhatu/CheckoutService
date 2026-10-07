@@ -217,3 +217,11 @@ export async function checkout(couponCode = null) {
 export function clearCart() {
   localStorage.removeItem(CART_ID_KEY);
 }
+
+export async function getOrder(orderId) {
+  const data = await request(
+    `/orders/${orderId}`
+  );
+
+  return data.order;
+}

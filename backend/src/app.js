@@ -5,6 +5,7 @@ import productRoutes from "./routes/productRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
 import checkoutRoutes from "./routes/checkoutRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import orderRoutes from "./routes/orderRoutes.js";
 
 import { errorHandler } from "./middleware/errorHandler.js";
 
@@ -44,6 +45,11 @@ app.use(
 app.use(
   "/api/admin",
   adminRoutes
+);
+
+app.use(
+  "/api/orders",
+  orderRoutes
 );
 
 

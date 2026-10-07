@@ -39,9 +39,7 @@ function Checkout() {
         couponCode.trim() || null
       );
 
-      navigate("/confirmation", {
-        state: { order },
-      });
+      navigate(`/confirmation/${order.id}`);
     } catch (error) {
       setError(error.message);
     } finally {

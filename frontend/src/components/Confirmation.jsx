@@ -1,11 +1,28 @@
-import { Link, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+
+import { getOrder } from "../api";
 
 function Confirmation() {
-  const location = useLocation();
+  const { orderId } = useParams();
 
-  const order = location.state?.order;
+  const [order, setOrder] = useState(null);
+  const [error, setError] = useState("");
 
-  if (!order) {
+  useEffect(() => {
+    async function loadOrder() {
+      try {
+        const data = await getOrder(orderId);
+        setOrder(data);
+      } catch (error) {
+        setError(error.message);
+      }
+    }
+
+    loadOrder();
+  }, [orderId]);
+
+  if (error) {
     return (
       <main className="empty-cart-page">
         <div className="empty-cart-icon">
@@ -15,7 +32,7 @@ function Confirmation() {
         <h1>Order not found</h1>
 
         <p>
-          We couldn't find the order details.
+          {error}
         </p>
 
         <Link
@@ -25,6 +42,14 @@ function Confirmation() {
           Continue shopping
         </Link>
       </main>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="page-loading">
+        Loading order...
+      </div>
     );
   }
 
@@ -46,10 +71,9 @@ function Confirmation() {
       </p>
 
       <p>
-        Total:{" "}
+        Subtotal:{" "}
         <strong>
-          $
-          {(order.total_cents / 100).toFixed(2)}
+          ${(order.subtotal_cents / 100).toFixed(2)}
         </strong>
       </p>
 
@@ -57,11 +81,33 @@ function Confirmation() {
         <p>
           Discount:{" "}
           <strong>
-            $
-            {(order.discount_cents / 100).toFixed(2)}
+            -${(order.discount_cents / 100).toFixed(2)}
           </strong>
         </p>
       )}
+
+      <p>
+        Shipping:{" "}
+        <strong>
+          {order.shipping_cents === 0
+            ? "FREE"
+            : `$${(order.shipping_cents / 100).toFixed(2)}`}
+        </strong>
+      </p>
+
+      <p>
+        Tax:{" "}
+        <strong>
+          ${(order.tax_cents / 100).toFixed(2)}
+        </strong>
+      </p>
+
+      <p>
+        Total:{" "}
+        <strong>
+          ${(order.total_cents / 100).toFixed(2)}
+        </strong>
+      </p>
 
       <Link
         to="/"

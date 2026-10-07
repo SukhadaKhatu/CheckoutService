@@ -569,3 +569,7 @@ async function getOrderById(
     items: itemsResult.rows,
   };
 }
+
+export async function findOrderById(orderId) {
+  return getOrderById(pool, orderId);
+}
