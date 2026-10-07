@@ -20,6 +20,8 @@ export function errorHandler(
   INSUFFICIENT_INVENTORY: 409,
   CART_ALREADY_CHECKED_OUT: 409,
   COUPON_ALREADY_REDEEMED: 409,
+
+  REWARD_CONFIG_NOT_FOUND: 500,
 };
 
   const status =

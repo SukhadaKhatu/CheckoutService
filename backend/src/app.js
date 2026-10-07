@@ -4,6 +4,7 @@ import cors from "cors";
 import productRoutes from "./routes/productRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js";
 import checkoutRoutes from "./routes/checkoutRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 
 import { errorHandler } from "./middleware/errorHandler.js";
 
@@ -38,6 +39,11 @@ app.use(
 app.use(
   "/api/carts",
   checkoutRoutes
+);
+
+app.use(
+  "/api/admin",
+  adminRoutes
 );
 
 
